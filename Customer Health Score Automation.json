@@ -1,0 +1,235 @@
+{
+  "name": "Customer Health Score Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "48ad0502-6685-4c49-b503-51f052f311ee",
+      "name": "Daily Trigger (8AM Weekdays)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1328,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "alert-condition",
+              "leftValue": "={{$json.needs_alert}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "6605cd3a-b533-4c02-b0bb-ae066de1d565",
+      "name": "Risk Level Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "text": ":rotating_light: *At-Risk Account Alert*\n\n*Account:* {{$json.account_name}}\n*Health Score:* {{$json.health_score}}/100\n*Risk Level:* {{$json.risk_level | upper}}\n*Churn Probability:* {{($json.churn_probability * 100).toFixed(0)}}%\n*ARR at Risk:* ${{$json.arr | number}}\n*Renewal:* {{$json.renewal_date}}\n\n*Key Risks:*\n{{$json.key_risks}}\n\n*Recommended Actions:*\n{{$json.recommended_actions}}\n\n_Analyzed by n8n Health Score Automation_",
+        "otherOptions": {}
+      },
+      "id": "9ecb5786-5fc4-41ed-b315-98a8e874b6c6",
+      "name": "Send Slack Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "ed50dadc-89b1-4f88-80c5-43298c87cf64",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "value": "Health Scores"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "account_id": "={{$json.account_id}}",
+            "account_name": "={{$json.account_name}}",
+            "health_score": "={{$json.health_score}}",
+            "risk_level": "={{$json.risk_level}}",
+            "churn_probability": "={{$json.churn_probability}}",
+            "arr": "={{$json.arr}}",
+            "renewal_date": "={{$json.renewal_date}}",
+            "key_risks": "={{$json.key_risks}}",
+            "recommended_actions": "={{$json.recommended_actions}}",
+            "analyzed_at": "={{$json.analyzed_at}}"
+          }
+        },
+        "options": {}
+      },
+      "id": "ee511f63-9733-40a1-bdcb-6a7a8cbfef96",
+      "name": "Log to Google Sheets Dashboard",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        0,
+        240
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "name": "=URGENT: {{$json.account_name}} — Health Score {{$json.health_score}} ({{$json.risk_level | upper}})",
+        "otherProperties": {}
+      },
+      "id": "40964be4-d013-4913-b1da-44ef59ef096c",
+      "name": "Create Follow-Up Task (Asana)",
+      "type": "n8n-nodes-base.asana",
+      "typeVersion": 1,
+      "position": [
+        224,
+        0
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      account_id: \"ACC-001\",\n      account_name: \"Bright Horizons LLC\",\n      industry: \"Healthcare\",\n      arr: 85000,\n      last_login_days: 14,\n      feature_adoption_pct: 42,\n      open_tickets: 7,\n      nps_score: 6,\n      renewal_date: \"2026-09-15\",\n      usage_trend: \"declining\"\n    }\n  },\n  {\n    json: {\n      account_id: \"ACC-002\",\n      account_name: \"Apex Dynamics Inc\",\n      industry: \"Financial Services\",\n      arr: 210000,\n      last_login_days: 2,\n      feature_adoption_pct: 87,\n      open_tickets: 1,\n      nps_score: 9,\n      renewal_date: \"2026-12-01\",\n      usage_trend: \"growing\"\n    }\n  },\n  {\n    json: {\n      account_id: \"ACC-003\",\n      account_name: \"Volta Systems\",\n      industry: \"Manufacturing\",\n      arr: 55000,\n      last_login_days: 30,\n      feature_adoption_pct: 28,\n      open_tickets: 12,\n      nps_score: 4,\n      renewal_date: \"2026-08-01\",\n      usage_trend: \"declining\"\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1024,
+        128
+      ],
+      "id": "1f0e0f21-fe72-4b93-acb0-e371123ac6a2",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "const accounts = $input.all();\n\nconst healthScores = {\n  \"ACC-001\": {\n    health_score: 32,\n    risk_level: \"high\",\n    churn_probability: 0.74,\n    key_risks: \"Low feature adoption; 14 days since last login; high ticket volume; declining usage trend\",\n    recommended_actions: \"Schedule executive business review; assign dedicated onboarding support; offer feature training session\"\n  },\n  \"ACC-002\": {\n    health_score: 91,\n    risk_level: \"low\",\n    churn_probability: 0.05,\n    key_risks: \"No significant risks identified\",\n    recommended_actions: \"Identify expansion opportunity; request case study or referral\"\n  },\n  \"ACC-003\": {\n    health_score: 18,\n    risk_level: \"critical\",\n    churn_probability: 0.89,\n    key_risks: \"30 days since last login; very low adoption; 12 open tickets; NPS score 4; renewal in 60 days\",\n    recommended_actions: \"Escalate to CSM leadership immediately; schedule emergency health call; review implementation gaps\"\n  }\n};\n\nreturn accounts.map(item => {\n  const account = item.json;\n  const scores = healthScores[account.account_id];\n  return {\n    json: {\n      ...account,\n      ...scores,\n      needs_alert: scores.risk_level === \"high\" || scores.risk_level === \"critical\",\n      analyzed_at: new Date().toISOString()\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -816,
+        128
+      ],
+      "id": "02259bc9-f554-4b6d-81fa-a0ef43461ee4",
+      "name": "Code in JavaScript1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily Trigger (8AM Weekdays)": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Risk Level Check": {
+      "main": [
+        [
+          {
+            "node": "Send Slack Alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log to Google Sheets Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log to Google Sheets Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Slack Alert": {
+      "main": [
+        [
+          {
+            "node": "Create Follow-Up Task (Asana)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Risk Level Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "d99dbedc-7e51-46dc-a95e-316dfcc7c508",
+  "meta": {
+    "instanceId": "7da140b02867c075ba8131e09f171a0dc9ac67b1c2d27f4618984cccf64e5247"
+  },
+  "nodeGroups": [],
+  "id": "4hNkyEFxuAlvC1rq",
+  "tags": []
+}
